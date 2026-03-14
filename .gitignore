@@ -1,0 +1,6 @@
+gcs-key.json
+__pycache__/
+*.pyc
+.env
+kitchen_photos/
+*.jpg
