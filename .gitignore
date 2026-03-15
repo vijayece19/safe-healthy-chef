@@ -1,6 +1,8 @@
-gcs-key.json
+demo_final.mp4
+demo_video.mkv
+my_voice.aac
+my_voice.raw
+*.raw
+*.aac
 __pycache__/
 *.pyc
-.env
-kitchen_photos/
-*.jpg
