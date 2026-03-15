@@ -6,12 +6,17 @@ Detects salt level, chilli powder, oil presence, vegetables.
 Scans every 30 seconds using Camera Module 3.
 Triggers voice alert for unhealthy ingredient levels.
 
+FIX: Replaced pyttsx3 with paplay subprocess.
+     pyttsx3 uses ALSA directly — conflicts with PipeWire.
+     paplay routes through PipeWire → captured by wf-recorder monitor.
+
 Part of: Safe & Healthy Chef — Multi-Agent System
 """
 
 import io
 import json
 import re
+import subprocess
 import threading
 import time
 from datetime import datetime
@@ -19,7 +24,6 @@ from datetime import datetime
 from google import genai
 from google.genai import types
 from PIL import Image
-import pyttsx3
 
 from config import (
     kitchen_state, state_lock, stop_flag,
@@ -28,10 +32,15 @@ from config import (
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  TTS HELPER
+#  TTS HELPER — paplay via PipeWire
 # ─────────────────────────────────────────────────────────────────────────────
 _tts_lock        = threading.Lock()
 _last_alert_time = 0
+
+HEADSET_SINK = (
+    "alsa_output.usb-USB_PnP_Sound_Device_USB_PnP_Sound_Device"
+    "-00.analog-stereo"
+)
 
 
 def speak(message: str):
@@ -42,12 +51,22 @@ def speak(message: str):
     with _tts_lock:
         _last_alert_time = now
         print(f"[Ingredient Agent TTS] 🔊 '{message}'")
-        engine = pyttsx3.init()
-        engine.setProperty("rate", 155)
-        engine.setProperty("volume", 1.0)
-        engine.say(message)
-        engine.runAndWait()
-        engine.stop()
+        try:
+            espeak = subprocess.Popen(
+                ["espeak", "-s", "130", "--stdout", message],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+            )
+            paplay = subprocess.Popen(
+                ["paplay", "-d", HEADSET_SINK],
+                stdin=espeak.stdout,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            espeak.stdout.close()
+            paplay.wait()
+        except Exception as e:
+            print(f"[Ingredient Agent TTS] Error: {e}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
